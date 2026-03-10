@@ -138,6 +138,9 @@ Generate container environment variables
 - name: {{ $key }}
   value: {{ $value | quote }}
 {{- end }}
+{{- with .Values.env.extra }}
+{{ toYaml . }}
+{{- end }}
 {{- if .Values.env.configMapRef }}
 - name: CONFIG_MAP_REF
   valueFrom:
