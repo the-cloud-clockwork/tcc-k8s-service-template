@@ -14,12 +14,13 @@ permissions:
   pull-requests: write
 
 jobs:
-  release:
+  compute-version:
     runs-on: ubuntu-latest
+    outputs:
+      current: ${{ steps.version.outputs.current }}
+      next: ${{ steps.version.outputs.next }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Compute next version
         id: version
@@ -35,15 +36,42 @@ jobs:
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
           echo "next=$NEXT" >> "$GITHUB_OUTPUT"
 
+  # Dev branch: bump, commit, push directly (triggers release-dev-chart.yml)
+  release-dev:
+    needs: compute-version
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump version and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          sed -i 's/^version: .*/version: ${{ needs.compute-version.outputs.next }}/' Chart.yaml
+          git add Chart.yaml
+          git commit -m "chore: bump dev to v${{ needs.compute-version.outputs.next }}"
+          git push origin dev
+
+  # Main branch: create release branch + PR (respects branch protection)
+  release-main:
+    needs: compute-version
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Create release branch and bump version
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b release/v${{ steps.version.outputs.next }}
-          sed -i 's/^version: .*/version: ${{ steps.version.outputs.next }}/' Chart.yaml
+          git checkout -b release/v${{ needs.compute-version.outputs.next }}
+          sed -i 's/^version: .*/version: ${{ needs.compute-version.outputs.next }}/' Chart.yaml
           git add Chart.yaml
-          git commit -m "chore: release v${{ steps.version.outputs.next }}"
-          git push origin release/v${{ steps.version.outputs.next }}
+          git commit -m "chore: release v${{ needs.compute-version.outputs.next }}"
+          git push origin release/v${{ needs.compute-version.outputs.next }}
 
       - name: Create pull request
         env:
@@ -51,8 +79,8 @@ jobs:
         run: |
           gh pr create \
             --base main \
-            --head release/v${{ steps.version.outputs.next }} \
-            --title "chore: release v${{ steps.version.outputs.next }}" \
-            --body "Bumps chart version from \`${{ steps.version.outputs.current }}\` to \`${{ steps.version.outputs.next }}\` (${{ inputs.bump }}).
+            --head release/v${{ needs.compute-version.outputs.next }} \
+            --title "chore: release v${{ needs.compute-version.outputs.next }}" \
+            --body "Bumps chart version from \`${{ needs.compute-version.outputs.current }}\` to \`${{ needs.compute-version.outputs.next }}\` (${{ inputs.bump }}).
 
           Merging this PR will automatically tag and publish the chart to GHCR."
