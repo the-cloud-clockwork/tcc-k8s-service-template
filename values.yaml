@@ -1,0 +1,664 @@
+# Global configuration
+global:
+  environment: "dev"
+  project: "k8s-service-template"
+
+# Kubernetes service discovery configuration
+# Set to false to disable automatic injection of service environment variables
+enableServiceLinks: true
+
+# Application configuration
+app:
+  name: "service-app"
+  image:
+    repository: "nginx"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  # Service type: deployment or statefulset
+  type: "deployment"
+  
+  # Replica configuration
+  replicaCount: 1
+  
+  # Deployment strategy configuration
+  strategy:
+    type: RollingUpdate  # RollingUpdate or Recreate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  
+  # Container configuration
+  container:
+    port: 8080
+    command: []
+    args: []
+    
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+      
+  # Health checks
+  healthChecks:
+    enabled: true
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+# Environment variables
+env:
+  # Static environment variables
+  variables:
+    ENV: "development"
+    LOG_LEVEL: "info"
+  
+  # Reference to configmap
+  configMapRef: ""
+  
+  # Reference to secrets
+  secretRef: ""
+
+# ConfigMap configuration
+configMap:
+  enabled: true
+  data: {}
+
+# Config Files mounting configuration
+configFiles:
+  enabled: false
+  
+  # Strategy 1: Persistent Volume Claim mounting
+  # Upload your config files to a PVC and mount them directly
+  pvc:
+    enabled: false
+    volumes: []
+      # Example:
+      # - name: "config-volume"
+      #   claimName: "config-pvc"        # Pre-existing PVC with config files
+      #   mountPath: "/app/config.yaml"  # Where to mount in container
+      #   subPath: "config.yaml"         # Specific file from PVC (optional)
+      #   readOnly: true                 # Mount as read-only (optional)
+  
+  # Strategy 2: InitContainer + EmptyDir for dynamic config fetching
+  # Download config files during pod startup from external sources
+  initContainer:
+    enabled: false
+    image: "alpine:latest"  # Image with required tools (wget, aws cli, git)
+    resources: {}           # Resource limits for init container (optional)
+    sources: []
+      # Examples:
+      # - url: "https://example.com/config.yaml"
+      #   mountPath: "/app/config.yaml"
+      #   method: "http"           # http, s3, git
+      #   subPath: "config.yaml"   # File name in temp volume
+      # - url: "s3://bucket/config.yaml"
+      #   mountPath: "/app/config.yaml"
+      #   method: "s3"
+      #   subPath: "config.yaml"
+      # - url: "https://github.com/user/configs.git"
+      #   mountPath: "/app/config.yaml"
+      #   method: "git"
+      #   path: "config.yaml"     # Path within git repo
+      #   subPath: "config.yaml"
+  
+  # Strategy 3: HostPath mounting for direct host file access
+  # Mount files directly from Kubernetes node filesystem
+  hostPath:
+    enabled: false
+    volumes: []
+      # Example:
+      # - name: "host-config"
+      #   path: "/opt/configs/config.yaml"  # Path on host node
+      #   mountPath: "/app/config.yaml"     # Where to mount in container
+      #   type: "File"                      # File, Directory, etc.
+      #   readOnly: true                    # Mount as read-only (optional)
+
+# Secrets configuration
+secrets:
+  enabled: true
+  
+  # External secrets (created outside Helm)
+  external:
+    enabled: false
+    # Single secret reference (for backward compatibility)
+    secretName: ""
+    # Multiple secret references (preferred approach)
+    envFrom: []
+      # - secretRef:
+      #     name: "external-secret-1"
+      # - secretRef:
+      #     name: "external-secret-2"
+  
+  # Vault integration
+  vault:
+    enabled: false
+    path: "secret/data/apps"
+    secrets: []
+      # - name: "DATABASE_PASSWORD"
+      #   key: "db_password"
+  
+  # Manual secrets (base64 encoded)
+  data: {}
+
+# Service configuration
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+# Ingress configuration with AWS ALB Controller
+ingress:
+  enabled: true
+  className: "alb"
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-port: "8080"
+    alb.ingress.kubernetes.io/healthcheck-path: "/health"
+    alb.ingress.kubernetes.io/success-codes: "200,404"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+  
+  # AWS-specific configuration
+  aws:
+    subnets: ""
+    securityGroups: ""
+    certificateArn: ""
+    groupName: "default-group"
+    loadBalancerAttributes: ""
+  
+  # Host configuration
+  hosts:
+    - host: "app.example.com"
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: ""  # Will be auto-generated
+              port:
+                number: 80
+
+# Additional Ingress Resources
+# Allows creating multiple ingress resources with independent configurations
+# Each additional ingress can have its own className, namespace, annotations, and hosts
+additionalIngresses: []
+  # Example configuration:
+  # - name: "secondary"           # Required: unique name for the ingress
+  #   enabled: true                # Optional: enable/disable this ingress (default: true)
+  #   className: "nginx"           # Optional: ingress class name
+  #   targetNamespace: ""          # Optional: deploy to different namespace
+  #   annotations:                 # Optional: ingress-specific annotations
+  #     nginx.ingress.kubernetes.io/rewrite-target: /
+  #   aws:                         # Optional: AWS ALB-specific configuration
+  #     subnets: ""
+  #     securityGroups: ""
+  #     certificateArn: ""
+  #     groupName: ""
+  #     loadBalancerAttributes: ""
+  #   hosts:                       # Required: host and path configuration
+  #     - host: "secondary.example.com"
+  #       paths:
+  #         - path: /
+  #           pathType: Prefix
+  #           backend:
+  #             service:
+  #               name: ""         # Will use default service if not specified
+  #               port:
+  #                 number: 80
+
+# TargetGroupBinding configuration (Alternative to Ingress)
+# Use this when you want to connect services to pre-existing AWS ALB Target Groups
+targetGroupBinding:
+  enabled: false
+  
+  # Required: ARN of the existing AWS Target Group
+  targetGroupARN: ""
+  # Example: "arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/my-targets/1234567890123456"
+  
+  # Service reference (defaults to chart service if not specified)
+  serviceRef:
+    name: ""    # Defaults to chart service name
+    port: 80    # Defaults to service.port
+  
+  # Target type (ip or instance)
+  targetType: "ip"
+  
+  # VPC ID (optional, usually auto-detected)
+  vpcID: ""
+  
+  # Health check configuration (optional, can override ALB target group settings)
+  healthCheckPath: ""
+  healthCheckPort: ""
+  healthCheckProtocol: ""
+  healthCheckIntervalSeconds: ""
+  healthCheckTimeoutSeconds: ""
+  healthyThresholdCount: ""
+  unhealthyThresholdCount: ""
+  
+  # Node selector for instance target type (optional)
+  nodeSelector: {}
+  
+  # Additional annotations (optional)
+  annotations: {}
+
+# Database StatefulSet configuration (optional)
+database:
+  enabled: false
+  type: postgresql  # postgresql, mysql, mongodb, redis
+
+  # StatefulSet configuration
+  statefulset:
+    replicaCount: 1
+
+  # Container configuration
+  image:
+    repository: postgres
+    tag: "15.3"
+    pullPolicy: IfNotPresent
+
+  # Resources
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  # Environment variables for database
+  env:
+    POSTGRES_DB: "appdb"
+    POSTGRES_USER: "appuser"
+    # POSTGRES_PASSWORD will come from secrets
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 5432
+
+  # Persistence
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: "gp3"
+    accessMode: ReadWriteOnce
+
+  # Pod Disruption Budget for database
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+    # maxUnavailable: 0  # Alternative to minAvailable
+
+  # Database-specific scheduling configuration
+  # These settings override global nodeSelector, tolerations, and affinity for the database StatefulSet
+  # If not specified, the global values will be used
+  nodeSelector: {}
+    # Example:
+    # kubernetes.io/arch: amd64
+    # tenant: your-team
+    # large: "true"
+
+  tolerations: []
+    # Example:
+    # - key: "large"
+    #   operator: "Equal"
+    #   value: "true"
+    #   effect: "NoSchedule"
+    # - key: "tenant"
+    #   operator: "Equal"
+    #   value: "your-team"
+    #   effect: "NoSchedule"
+
+  affinity: {}
+    # Example:
+    # nodeAffinity:
+    #   requiredDuringSchedulingIgnoredDuringExecution:
+    #     nodeSelectorTerms:
+    #       - matchExpressions:
+    #           - key: node.kubernetes.io/instance-type
+    #             operator: In
+    #             values:
+    #               - m5.xlarge
+    #               - m5.2xlarge
+
+# Multiple Database StatefulSets configuration
+# Allows creating additional database StatefulSets beyond the main database
+# Each database can have its own type, scaling, resources, and persistence configuration
+databases: {}
+  # Example configuration for multiple Redis instances:
+  # redis-cache:
+  #   enabled: true
+  #   type: redis
+  #
+  #   # StatefulSet configuration
+  #   statefulset:
+  #     replicaCount: 1
+  #
+  #   # Container configuration
+  #   image:
+  #     repository: redis
+  #     tag: "7.2"
+  #     pullPolicy: IfNotPresent
+  #
+  #   # Resources
+  #   resources:
+  #     limits:
+  #       cpu: 500m
+  #       memory: 512Mi
+  #     requests:
+  #       cpu: 250m
+  #       memory: 256Mi
+  #
+  #   # Environment variables for database
+  #   env:
+  #     REDIS_DB: "0"
+  #
+  #   # Password configuration (optional - for custom secret keys)
+  #   # By default uses standard keys: REDIS_PASSWORD, postgres-password, etc.
+  #   passwordSecretName: ""      # Override secret name (defaults to global secret)
+  #   passwordSecretKey: ""       # Override secret key (e.g., "CACHE_PASSWORD")
+  #
+  #   # Service configuration
+  #   service:
+  #     type: ClusterIP
+  #     port: 6379
+  #
+  #   # Persistence
+  #   persistence:
+  #     enabled: true
+  #     size: 5Gi
+  #     storageClass: "gp3"
+  #     accessMode: ReadWriteOnce
+  #
+  #   # Database-specific scheduling (overrides global values)
+  #   nodeSelector: {}
+  #   tolerations: []
+  #   affinity: {}
+  #
+  #   # Pod Disruption Budget for this database
+  #   podDisruptionBudget:
+  #     enabled: false
+  #     minAvailable: 1
+  #
+  # redis-queue:
+  #   enabled: true
+  #   type: redis
+  #   passwordSecretKey: "QUEUE_PASSWORD"  # Custom password key
+  #   statefulset:
+  #     replicaCount: 1
+  #   image:
+  #     repository: redis
+  #     tag: "7.2"
+  #     pullPolicy: IfNotPresent
+  #   resources:
+  #     limits:
+  #       cpu: 1000m
+  #       memory: 1Gi
+  #     requests:
+  #       cpu: 500m
+  #       memory: 512Mi
+  #   env:
+  #     REDIS_DB: "1"
+  #   service:
+  #     type: ClusterIP
+  #     port: 6379
+  #   persistence:
+  #     enabled: true
+  #     size: 10Gi
+  #     storageClass: "gp3"
+  #     accessMode: ReadWriteOnce
+  #
+  # Example: PostgreSQL with custom password
+  # postgres-primary:
+  #   enabled: true
+  #   type: postgresql
+  #   passwordSecretKey: "POSTGRES_PRIMARY_PASSWORD"  # Custom key
+  #   statefulset:
+  #     replicaCount: 1
+  #   image:
+  #     repository: postgres
+  #     tag: "15.3"
+  #     pullPolicy: IfNotPresent
+  #   resources:
+  #     limits:
+  #       cpu: 2000m
+  #       memory: 2Gi
+  #     requests:
+  #       cpu: 1000m
+  #       memory: 1Gi
+  #   env:
+  #     POSTGRES_DB: "myapp"
+  #     POSTGRES_USER: "appuser"
+  #   service:
+  #     type: ClusterIP
+  #     port: 5432
+  #   persistence:
+  #     enabled: true
+  #     size: 20Gi
+  #     storageClass: "gp3"
+  #     accessMode: ReadWriteOnce
+
+# Persistent Volume configuration
+persistence:
+  enabled: false
+  volumes: []
+    # - name: "data-volume"
+    #   size: "10Gi"
+    #   accessMode: "ReadWriteOnce"
+    #   storageClass: "gp3"
+    #   mountPath: "/data"
+
+# Auto-scaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  # Advanced scaling behavior configuration (optional)
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      percent: 10
+      periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      percent: 100
+      pods: 2
+      periodSeconds: 15
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Security Context
+securityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress: []
+    # - from:
+    #     - namespaceSelector:
+    #         matchLabels:
+    #           name: production
+    #   ports:
+    #     - protocol: TCP
+    #       port: 8080
+  
+  egress: []
+    # - to: []
+    #   ports:
+    #     - protocol: TCP
+    #       port: 5432
+
+# ExternalName Service (for cross-namespace routing)
+externalService:
+  enabled: false
+  name: ""
+  targetNamespace: ""
+  externalName: ""
+  port: 80
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# RBAC
+rbac:
+  create: true
+  rules: []
+
+# Monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    port: metrics
+    path: /metrics
+    interval: 30s
+    
+# Pod annotations and labels
+podAnnotations: {}
+podLabels: {}
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Priority Class
+priorityClassName: ""
+
+# Init containers
+initContainers: []
+
+# Sidecar containers
+sidecars: []
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Custom labels for all resources
+commonLabels: {}
+
+# Custom annotations for all resources
+commonAnnotations: {}
+
+# Multi-deployment configuration
+# Allows creating additional deployments beyond the main app deployment
+# Each deployment can have its own scaling, resources, and PDB configuration
+deployments: {}
+  # Example configuration for worker deployments:
+  # worker:
+  #   enabled: true
+  #   role: "worker"
+  #   replicaCount: 2
+  #   
+  #   # Worker-specific environment variables
+  #   env:
+  #     WORKER_MODE: "true"
+  #     QUEUE_NAME: "worker-queue"
+  #   
+  #   # Worker-specific resource allocation
+  #   resources:
+  #     limits:
+  #       cpu: 1000m
+  #       memory: 1Gi
+  #     requests:
+  #       cpu: 500m
+  #       memory: 512Mi
+  #   
+  #   # Worker-specific health checks
+  #   healthChecks:
+  #     enabled: true
+  #     livenessProbe:
+  #       httpGet:
+  #         path: /health
+  #         port: 8080
+  #       initialDelaySeconds: 30
+  #       periodSeconds: 10
+  #   
+  #   # Worker-specific service (usually disabled for background workers)
+  #   service:
+  #     enabled: false
+  #   
+  #   # Independent autoscaling for workers
+  #   autoscaling:
+  #     enabled: true
+  #     minReplicas: 2
+  #     maxReplicas: 10
+  #     targetCPUUtilizationPercentage: 70
+  #     targetMemoryUtilizationPercentage: 80
+  #     behavior:
+  #       scaleDown:
+  #         stabilizationWindowSeconds: 300
+  #         percent: 20
+  #         periodSeconds: 60
+  #       scaleUp:
+  #         stabilizationWindowSeconds: 60
+  #         percent: 100
+  #         pods: 3
+  #         periodSeconds: 15
+  #   
+  #   # Independent PDB for workers
+  #   podDisruptionBudget:
+  #     enabled: true
+  #     maxUnavailable: 1
+  #     # minAvailable: 1  # Alternative to maxUnavailable
+
+# Extra volumes and volume mounts for advanced use cases
+extraVolumes: []
+  # Example:
+  # - name: config-source
+  #   configMap:
+  #     name: my-configmap
+  # - name: shared-data
+  #   emptyDir: {}
+
+extraVolumeMounts: []
+  # Example:
+  # - name: config-source
+  #   mountPath: /app/config.yaml
+  #   subPath: config.yaml
+  #   readOnly: true

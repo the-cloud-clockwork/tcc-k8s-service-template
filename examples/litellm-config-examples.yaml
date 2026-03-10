@@ -1,0 +1,242 @@
+# LiteLLM Config File Mounting Examples
+# This file demonstrates different approaches to mount config.yaml for LiteLLM
+
+# ==============================================================================
+# Example 1: PVC-based Config Mounting (Recommended for Production)
+# ==============================================================================
+# Prerequisites:
+# 1. Create a PVC with your config file:
+#    kubectl create pvc litellm-config-pvc --size=1Gi --access-modes=ReadWriteOnce
+# 2. Upload config.yaml to the PVC:
+#    kubectl create -f - <<EOF
+#    apiVersion: v1
+#    kind: Pod
+#    metadata:
+#      name: config-uploader
+#    spec:
+#      containers:
+#      - name: uploader
+#        image: alpine
+#        command: ["/bin/sh", "-c", "sleep 3600"]
+#        volumeMounts:
+#        - name: config-volume
+#          mountPath: /data
+#      volumes:
+#      - name: config-volume
+#        persistentVolumeClaim:
+#          claimName: litellm-config-pvc
+#      restartPolicy: Never
+#    EOF
+# 3. Copy your config file:
+#    kubectl cp config.yaml config-uploader:/data/config.yaml
+# 4. Clean up:
+#    kubectl delete pod config-uploader
+
+litellm-pvc-example:
+  global:
+    environment: "qa"
+    project: "litellm-gateway"
+  
+  app:
+    name: "litellm-gateway"
+    image:
+      repository: "ghcr.io/berriai/litellm"
+      tag: "main-latest"
+    container:
+      port: 4000
+  
+  configFiles:
+    enabled: true
+    pvc:
+      enabled: true
+      volumes:
+        - name: "litellm-config"
+          claimName: "litellm-config-pvc"  # Your pre-created PVC
+          mountPath: "/app/config.yaml"
+          subPath: "config.yaml"
+          readOnly: true
+  
+  service:
+    port: 4000
+    targetPort: 4000
+
+---
+
+# ==============================================================================
+# Example 2: InitContainer with S3 Download (Dynamic Config)
+# ==============================================================================
+# Prerequisites:
+# - Use an init container image with AWS CLI (e.g., amazon/aws-cli)
+# - Configure AWS credentials via IAM roles or service account annotations
+
+litellm-s3-example:
+  global:
+    environment: "qa"
+    project: "litellm-gateway"
+  
+  app:
+    name: "litellm-gateway"
+    image:
+      repository: "ghcr.io/berriai/litellm"
+      tag: "main-latest"
+    container:
+      port: 4000
+  
+  configFiles:
+    enabled: true
+    initContainer:
+      enabled: true
+      image: "amazon/aws-cli:latest"
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+      sources:
+        - url: "s3://my-configs-bucket/litellm/config.yaml"
+          mountPath: "/app/config.yaml"
+          method: "s3"
+          subPath: "config.yaml"
+  
+  # AWS IAM role for service account
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT:role/litellm-config-reader"
+
+---
+
+# ==============================================================================
+# Example 3: InitContainer with HTTP Download (Simple)
+# ==============================================================================
+
+litellm-http-example:
+  global:
+    environment: "dev"
+    project: "litellm-gateway"
+  
+  app:
+    name: "litellm-gateway"
+    image:
+      repository: "ghcr.io/berriai/litellm"
+      tag: "main-latest"
+    container:
+      port: 4000
+  
+  configFiles:
+    enabled: true
+    initContainer:
+      enabled: true
+      image: "alpine:latest"
+      sources:
+        - url: "https://my-config-server.com/litellm/config.yaml"
+          mountPath: "/app/config.yaml"
+          method: "http"
+          subPath: "config.yaml"
+
+---
+
+# ==============================================================================
+# Example 4: HostPath Mounting (Node-specific configs)
+# ==============================================================================
+# Prerequisites:
+# - Config file must exist on each Kubernetes node at the specified path
+# - Suitable for configs that vary by node or environment
+
+litellm-hostpath-example:
+  global:
+    environment: "dev" 
+    project: "litellm-gateway"
+  
+  app:
+    name: "litellm-gateway"
+    image:
+      repository: "ghcr.io/berriai/litellm"
+      tag: "main-latest"
+    container:
+      port: 4000
+  
+  configFiles:
+    enabled: true
+    hostPath:
+      enabled: true
+      volumes:
+        - name: "node-config"
+          path: "/opt/litellm/config.yaml"  # File on each node
+          mountPath: "/app/config.yaml"
+          type: "File"
+          readOnly: true
+
+---
+
+# ==============================================================================
+# Example 5: Multiple Config Files
+# ==============================================================================
+
+litellm-multi-config-example:
+  global:
+    environment: "prod"
+    project: "litellm-gateway"
+  
+  app:
+    name: "litellm-gateway"
+    image:
+      repository: "ghcr.io/berriai/litellm"
+      tag: "main-latest"
+    container:
+      port: 4000
+  
+  configFiles:
+    enabled: true
+    pvc:
+      enabled: true
+      volumes:
+        # Main LiteLLM config
+        - name: "litellm-config"
+          claimName: "litellm-config-pvc"
+          mountPath: "/app/config.yaml"
+          subPath: "config.yaml"
+          readOnly: true
+        # Model definitions
+        - name: "model-config"
+          claimName: "litellm-config-pvc"
+          mountPath: "/app/models.yaml"
+          subPath: "models.yaml"
+          readOnly: true
+        # Logging configuration
+        - name: "logging-config"
+          claimName: "litellm-config-pvc"
+          mountPath: "/app/logging.conf"
+          subPath: "logging.conf"
+          readOnly: true
+
+---
+
+# ==============================================================================
+# Sample config.yaml for LiteLLM
+# ==============================================================================
+# Create this file and upload to your PVC or serve via HTTP/S3
+
+sample-config-yaml: |
+  model_list:
+    - model_name: claude-sonnet-4
+      litellm_params:
+        model: bedrock/anthropic.claude-sonnet-4-20250514-v1:0
+        model_id: arn:aws:bedrock:eu-west-1:248122438025:inference-profile/eu.anthropic.claude-sonnet-4-20250514-v1:0
+        region_name: eu-west-1
+    - model_name: gpt-4
+      litellm_params:
+        model: azure/gpt-4
+        api_base: https://my-azure.openai.azure.com
+        api_version: "2023-12-01-preview"
+  
+  general_settings:
+    master_key: os.environ/LITELLM_MASTER_KEY
+    database_url: os.environ/DATABASE_URL
+    store_model_in_db: true
+    
+  router_settings:
+    routing_strategy: least-busy
+    model_group_alias:
+      gpt-4: [gpt-4, claude-sonnet-4]

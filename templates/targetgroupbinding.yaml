@@ -1,0 +1,52 @@
+{{- if .Values.targetGroupBinding.enabled -}}
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-tgb
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  {{- with .Values.targetGroupBinding.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  serviceRef:
+    name: {{ .Values.targetGroupBinding.serviceRef.name | default (include "k8s-service-template.fullname" .) }}
+    port: {{ .Values.targetGroupBinding.serviceRef.port | default .Values.service.port }}
+  targetGroupARN: {{ .Values.targetGroupBinding.targetGroupARN | quote }}
+  {{- if .Values.targetGroupBinding.targetType }}
+  targetType: {{ .Values.targetGroupBinding.targetType }}
+  {{- end }}
+  {{- if .Values.targetGroupBinding.vpcID }}
+  vpcID: {{ .Values.targetGroupBinding.vpcID | quote }}
+  {{- end }}
+  {{- if .Values.targetGroupBinding.healthCheckPath }}
+  healthcheck:
+    path: {{ .Values.targetGroupBinding.healthCheckPath | quote }}
+    {{- if .Values.targetGroupBinding.healthCheckPort }}
+    port: {{ .Values.targetGroupBinding.healthCheckPort }}
+    {{- end }}
+    {{- if .Values.targetGroupBinding.healthCheckProtocol }}
+    protocol: {{ .Values.targetGroupBinding.healthCheckProtocol | quote }}
+    {{- end }}
+    {{- if .Values.targetGroupBinding.healthCheckIntervalSeconds }}
+    intervalSeconds: {{ .Values.targetGroupBinding.healthCheckIntervalSeconds }}
+    {{- end }}
+    {{- if .Values.targetGroupBinding.healthCheckTimeoutSeconds }}
+    timeoutSeconds: {{ .Values.targetGroupBinding.healthCheckTimeoutSeconds }}
+    {{- end }}
+    {{- if .Values.targetGroupBinding.healthyThresholdCount }}
+    healthyThresholdCount: {{ .Values.targetGroupBinding.healthyThresholdCount }}
+    {{- end }}
+    {{- if .Values.targetGroupBinding.unhealthyThresholdCount }}
+    unhealthyThresholdCount: {{ .Values.targetGroupBinding.unhealthyThresholdCount }}
+    {{- end }}
+  {{- end }}
+  {{- if .Values.targetGroupBinding.nodeSelector }}
+  nodeSelector:
+    {{- with .Values.targetGroupBinding.nodeSelector }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+{{- end }}

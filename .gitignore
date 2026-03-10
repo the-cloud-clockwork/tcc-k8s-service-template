@@ -1,0 +1,117 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# AWS credentials and config
+.aws/
+aws-credentials
+*credentials*
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.envrc
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Backup files
+*.backup
+*.bak
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local configuration overrides
+local.tf
+local.tfvars
+dev.tfvars
+prod.tfvars
+
+# Terraform plan files
+*.tfplan
+plan.out
+
+# Certificate files
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# SSH keys
+id_rsa
+id_rsa.pub
+*.pem
+
+# Docker files (if any)
+.dockerignore
+
+# Node modules (if using any JS tools)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python files (if using any Python tools)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Terraform backend configuration (if sensitive)
+backend.tf
+
+# Local testing files
+test/
+tests/
+*.test
+
+# Documentation build files
+docs/_build/
+site/
+
+test_smtp.py
+.claude/
+*.tgz

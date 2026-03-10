@@ -1,0 +1,424 @@
+{{- if .Values.database.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-{{ .Values.database.type }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.database.labels" . | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  serviceName: {{ include "k8s-service-template.fullname" . }}-{{ .Values.database.type }}-headless
+  replicas: {{ .Values.database.statefulset.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "k8s-service-template.database.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-service-template.database.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if hasKey .Values "enableServiceLinks" }}
+      enableServiceLinks: {{ .Values.enableServiceLinks }}
+      {{- else }}
+      enableServiceLinks: true
+      {{- end }}
+      {{- include "k8s-service-template.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "k8s-service-template.serviceAccountName" . }}
+      {{- include "k8s-service-template.securityContext" . | nindent 6 }}
+      containers:
+        - name: {{ .Values.database.type }}
+          image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
+          imagePullPolicy: {{ .Values.database.image.pullPolicy }}
+          {{- if eq .Values.database.type "redis" }}
+          command:
+            - redis-server
+            - --requirepass
+            - $(REDIS_PASSWORD)
+          {{- end }}
+          ports:
+            - name: db
+              containerPort: {{ .Values.database.service.port }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.database.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if eq .Values.database.type "postgresql" }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-service-template.fullname" . }}-db-secrets
+                  key: postgres-password
+            {{- else if eq .Values.database.type "mysql" }}
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-service-template.fullname" . }}-db-secrets
+                  key: mysql-root-password
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-service-template.fullname" . }}-db-secrets
+                  key: mysql-password
+            {{- else if eq .Values.database.type "mongodb" }}
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-service-template.fullname" . }}-db-secrets
+                  key: mongodb-root-password
+            {{- else if eq .Values.database.type "redis" }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.external.secretName | default (printf "%s-secrets" (include "k8s-service-template.fullname" .)) }}
+                  key: REDIS_PASSWORD
+            {{- end }}
+          {{- if eq .Values.database.type "postgresql" }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ .Values.database.env.POSTGRES_USER }} -h 127.0.0.1 -p 5432
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - -e
+                - exec pg_isready -U {{ .Values.database.env.POSTGRES_USER }} -h 127.0.0.1 -p 5432
+          {{- else if eq .Values.database.type "mysql" }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -u root -p${MYSQL_ROOT_PASSWORD}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - mysql -h 127.0.0.1 -u root -p${MYSQL_ROOT_PASSWORD} -e 'SELECT 1'
+          {{- else if eq .Values.database.type "mongodb" }}
+          livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --disableImplicitSessions
+                - --eval
+                - "db.adminCommand('ping')"
+          readinessProbe:
+            exec:
+              command:
+                - mongo
+                - --disableImplicitSessions
+                - --eval
+                - "db.adminCommand('ping')"
+          {{- else if eq .Values.database.type "redis" }}
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - "$(REDIS_PASSWORD)"
+                - ping
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - "$(REDIS_PASSWORD)"
+                - ping
+          {{- end }}
+          resources:
+            {{- toYaml .Values.database.resources | nindent 12 }}
+          {{- if .Values.database.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ if eq .Values.database.type "postgresql" }}/var/lib/postgresql/data{{ else if eq .Values.database.type "mysql" }}/var/lib/mysql{{ else if eq .Values.database.type "mongodb" }}/data/db{{ else if eq .Values.database.type "redis" }}/data{{ end }}
+          {{- end }}
+      {{- with .Values.database.nodeSelector | default .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.database.affinity | default .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.database.tolerations | default .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.database.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "k8s-service-template.database.labels" . | nindent 10 }}
+      spec:
+        accessModes:
+          - {{ .Values.database.persistence.accessMode }}
+        storageClassName: {{ .Values.database.persistence.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.database.persistence.size }}
+  {{- end }}
+{{- end }}
+
+---
+{{- if .Values.database.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-{{ .Values.database.type }}-headless
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.database.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database-headless
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: {{ .Values.database.service.port }}
+      targetPort: db
+      protocol: TCP
+      name: db
+  selector:
+    {{- include "k8s-service-template.database.selectorLabels" . | nindent 4 }}
+{{- end }}
+
+{{- if .Values.databases }}
+{{- range $dbName, $db := .Values.databases }}
+{{- if $db.enabled }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ $dbName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.databases.labels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" $) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  serviceName: {{ include "k8s-service-template.fullname" $ }}-{{ $dbName }}-headless
+  replicas: {{ $db.statefulset.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "k8s-service-template.databases.selectorLabels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-service-template.databases.selectorLabels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 8 }}
+        {{- with $.Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") $ | sha256sum }}
+        {{- with $.Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if hasKey $.Values "enableServiceLinks" }}
+      enableServiceLinks: {{ $.Values.enableServiceLinks }}
+      {{- else }}
+      enableServiceLinks: true
+      {{- end }}
+      {{- include "k8s-service-template.imagePullSecrets" $ | nindent 6 }}
+      serviceAccountName: {{ include "k8s-service-template.serviceAccountName" $ }}
+      {{- include "k8s-service-template.securityContext" $ | nindent 6 }}
+      containers:
+        - name: {{ $db.type }}
+          image: "{{ $db.image.repository }}:{{ $db.image.tag }}"
+          imagePullPolicy: {{ $db.image.pullPolicy }}
+          {{- if eq $db.type "redis" }}
+          {{- $redisPasswordVar := $db.passwordSecretKey | default "REDIS_PASSWORD" }}
+          command:
+            - redis-server
+            - --requirepass
+            - $({{ $redisPasswordVar }})
+          {{- end }}
+          ports:
+            - name: db
+              containerPort: {{ $db.service.port }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := $db.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if eq $db.type "postgresql" }}
+            {{- $pgPasswordVar := $db.passwordSecretKey | default "POSTGRES_PASSWORD" }}
+            - name: {{ $pgPasswordVar }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.passwordSecretName | default (printf "%s-db-secrets" (include "k8s-service-template.fullname" $)) }}
+                  key: {{ $pgPasswordVar }}
+            {{- else if eq $db.type "mysql" }}
+            {{- $mysqlPasswordVar := $db.passwordSecretKey | default "MYSQL_ROOT_PASSWORD" }}
+            - name: {{ $mysqlPasswordVar }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.passwordSecretName | default (printf "%s-db-secrets" (include "k8s-service-template.fullname" $)) }}
+                  key: {{ $mysqlPasswordVar }}
+            {{- if ne $mysqlPasswordVar "MYSQL_PASSWORD" }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.passwordSecretName | default (printf "%s-db-secrets" (include "k8s-service-template.fullname" $)) }}
+                  key: {{ $mysqlPasswordVar }}
+            {{- end }}
+            {{- else if eq $db.type "mongodb" }}
+            {{- $mongoPasswordVar := $db.passwordSecretKey | default "MONGO_ROOT_PASSWORD" }}
+            - name: {{ $mongoPasswordVar }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.passwordSecretName | default (printf "%s-db-secrets" (include "k8s-service-template.fullname" $)) }}
+                  key: {{ $mongoPasswordVar }}
+            {{- else if eq $db.type "redis" }}
+            {{- $redisPasswordVar := $db.passwordSecretKey | default "REDIS_PASSWORD" }}
+            - name: {{ $redisPasswordVar }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.passwordSecretName | default ($.Values.secrets.external.secretName | default (printf "%s-secrets" (include "k8s-service-template.fullname" $))) }}
+                  key: {{ $redisPasswordVar }}
+            {{- end }}
+          {{- if eq $db.type "postgresql" }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ $db.env.POSTGRES_USER }} -h 127.0.0.1 -p 5432
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - -e
+                - exec pg_isready -U {{ $db.env.POSTGRES_USER }} -h 127.0.0.1 -p 5432
+          {{- else if eq $db.type "mysql" }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -u root -p${MYSQL_ROOT_PASSWORD}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - mysql -h 127.0.0.1 -u root -p${MYSQL_ROOT_PASSWORD} -e 'SELECT 1'
+          {{- else if eq $db.type "mongodb" }}
+          livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --disableImplicitSessions
+                - --eval
+                - "db.adminCommand('ping')"
+          readinessProbe:
+            exec:
+              command:
+                - mongo
+                - --disableImplicitSessions
+                - --eval
+                - "db.adminCommand('ping')"
+          {{- else if eq $db.type "redis" }}
+          {{- $redisPasswordVar := $db.passwordSecretKey | default "REDIS_PASSWORD" }}
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - "$({{ $redisPasswordVar }})"
+                - ping
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - "$({{ $redisPasswordVar }})"
+                - ping
+          {{- end }}
+          resources:
+            {{- toYaml $db.resources | nindent 12 }}
+          {{- if $db.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ if eq $db.type "postgresql" }}/var/lib/postgresql/data{{ else if eq $db.type "mysql" }}/var/lib/mysql{{ else if eq $db.type "mongodb" }}/data/db{{ else if eq $db.type "redis" }}/data{{ end }}
+          {{- end }}
+      {{- with ($db.nodeSelector | default $.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($db.affinity | default $.Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($db.tolerations | default $.Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if $db.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "k8s-service-template.databases.labels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 10 }}
+      spec:
+        accessModes:
+          - {{ $db.persistence.accessMode }}
+        storageClassName: {{ $db.persistence.storageClass }}
+        resources:
+          requests:
+            storage: {{ $db.persistence.size }}
+  {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ $dbName }}-headless
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.databases.labels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 4 }}
+    app.kubernetes.io/component: database-headless
+  {{- with (include "k8s-service-template.annotations" $) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: {{ $db.service.port }}
+      targetPort: db
+      protocol: TCP
+      name: db
+  selector:
+    {{- include "k8s-service-template.databases.selectorLabels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}
