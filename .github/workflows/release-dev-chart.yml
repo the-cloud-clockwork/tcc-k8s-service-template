@@ -24,8 +24,7 @@ jobs:
         id: version
         run: |
           BASE_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
-          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
-          echo "version=${BASE_VERSION}-dev.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${BASE_VERSION}-dev" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
