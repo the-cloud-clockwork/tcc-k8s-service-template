@@ -1,0 +1,116 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-ingress
+  namespace: {{ .Values.ingress.targetNamespace | default .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.ingress.aws.subnets }}
+    alb.ingress.kubernetes.io/subnets: {{ .Values.ingress.aws.subnets | quote }}
+    {{- end }}
+    {{- if .Values.ingress.aws.securityGroups }}
+    alb.ingress.kubernetes.io/security-groups: {{ .Values.ingress.aws.securityGroups | quote }}
+    {{- end }}
+    {{- if .Values.ingress.aws.certificateArn }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.aws.certificateArn | quote }}
+    {{- end }}
+    {{- if .Values.ingress.aws.groupName }}
+    alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.aws.groupName | quote }}
+    {{- end }}
+    {{- if .Values.ingress.aws.loadBalancerAttributes }}
+    alb.ingress.kubernetes.io/load-balancer-attributes: {{ .Values.ingress.aws.loadBalancerAttributes | quote }}
+    {{- end }}
+    {{- with (include "k8s-service-template.annotations" .) }}
+    {{- . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                {{- if and $.Values.deployments $.Values.deployments.master $.Values.deployments.master.enabled }}
+                name: {{ .backend.service.name | default (printf "%s-master" (include "k8s-service-template.fullname" $)) }}
+                {{- else }}
+                name: {{ .backend.service.name | default (include "k8s-service-template.fullname" $) }}
+                {{- end }}
+                port:
+                  number: {{ .backend.service.port.number }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+---
+{{- range .Values.additionalIngresses }}
+{{- if .enabled | default true }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ .name }}-ingress
+  namespace: {{ .targetNamespace | default $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" $ | nindent 4 }}
+    ingress-type: additional
+    ingress-name: {{ .name }}
+  annotations:
+    {{- with .annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .aws }}
+    {{- if .aws.subnets }}
+    alb.ingress.kubernetes.io/subnets: {{ .aws.subnets | quote }}
+    {{- end }}
+    {{- if .aws.securityGroups }}
+    alb.ingress.kubernetes.io/security-groups: {{ .aws.securityGroups | quote }}
+    {{- end }}
+    {{- if .aws.certificateArn }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ .aws.certificateArn | quote }}
+    {{- end }}
+    {{- if .aws.groupName }}
+    alb.ingress.kubernetes.io/group.name: {{ .aws.groupName | quote }}
+    {{- end }}
+    {{- if .aws.loadBalancerAttributes }}
+    alb.ingress.kubernetes.io/load-balancer-attributes: {{ .aws.loadBalancerAttributes | quote }}
+    {{- end }}
+    {{- end }}
+    {{- with (include "k8s-service-template.annotations" $) }}
+    {{- . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .className }}
+  ingressClassName: {{ .className }}
+  {{- end }}
+  rules:
+    {{- range .hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                {{- if and $.Values.deployments $.Values.deployments.master $.Values.deployments.master.enabled }}
+                name: {{ .backend.service.name | default (printf "%s-master" (include "k8s-service-template.fullname" $)) }}
+                {{- else }}
+                name: {{ .backend.service.name | default (include "k8s-service-template.fullname" $) }}
+                {{- end }}
+                port:
+                  number: {{ .backend.service.port.number }}
+          {{- end }}
+    {{- end }}
+---
+{{- end }}
+{{- end }}

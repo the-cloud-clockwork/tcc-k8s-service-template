@@ -1,0 +1,21 @@
+apiVersion: v2
+name: cloudeng-k8s-service-template
+description: A Helm chart for deploying services on Kubernetes with AWS Load Balancer Controller integration
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kubernetes
+  - service
+  - aws
+  - alb
+  - microservice
+home: https://github.com/clarivate-prod/cloudeng-k8s-service-template
+sources:
+  - https://github.com/clarivate-prod/cloudeng-k8s-service-template
+maintainers:
+  - name: Cloud Engineering
+    email: cloudengineering@clarivate.com
+icon: https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.svg
+annotations:
+  category: Infrastructure

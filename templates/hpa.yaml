@@ -1,0 +1,121 @@
+{{/*
+Main deployment HPA
+*/}}
+{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-hpa
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "k8s-service-template.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.behavior.scaleDown.stabilizationWindowSeconds | default 300 }}
+      policies:
+      - type: Percent
+        value: {{ .Values.autoscaling.behavior.scaleDown.percent | default 10 }}
+        periodSeconds: {{ .Values.autoscaling.behavior.scaleDown.periodSeconds | default 60 }}
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.autoscaling.behavior.scaleUp.stabilizationWindowSeconds | default 60 }}
+      policies:
+      - type: Percent
+        value: {{ .Values.autoscaling.behavior.scaleUp.percent | default 100 }}
+        periodSeconds: {{ .Values.autoscaling.behavior.scaleUp.periodSeconds | default 15 }}
+      - type: Pods
+        value: {{ .Values.autoscaling.behavior.scaleUp.pods | default 2 }}
+        periodSeconds: {{ .Values.autoscaling.behavior.scaleUp.periodSeconds | default 60 }}
+      selectPolicy: Max
+---
+{{- end }}
+{{/*
+Multi-deployment HPAs
+*/}}
+{{- if .Values.deployments }}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and $deployment.enabled $deployment.autoscaling $deployment.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ $deploymentName }}-hpa
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+  {{- with (include "k8s-service-template.annotations" $) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "k8s-service-template.fullname" $ }}-{{ $deploymentName }}
+  minReplicas: {{ $deployment.autoscaling.minReplicas }}
+  maxReplicas: {{ $deployment.autoscaling.maxReplicas }}
+  metrics:
+    {{- if $deployment.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $deployment.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $deployment.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $deployment.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{ dig "behavior" "scaleDown" "stabilizationWindowSeconds" 300 $deployment.autoscaling }}
+      policies:
+      - type: Percent
+        value: {{ dig "behavior" "scaleDown" "percent" 10 $deployment.autoscaling }}
+        periodSeconds: {{ dig "behavior" "scaleDown" "periodSeconds" 60 $deployment.autoscaling }}
+    scaleUp:
+      stabilizationWindowSeconds: {{ dig "behavior" "scaleUp" "stabilizationWindowSeconds" 60 $deployment.autoscaling }}
+      policies:
+      - type: Percent
+        value: {{ dig "behavior" "scaleUp" "percent" 100 $deployment.autoscaling }}
+        periodSeconds: {{ dig "behavior" "scaleUp" "periodSeconds" 15 $deployment.autoscaling }}
+      - type: Pods
+        value: {{ dig "behavior" "scaleUp" "pods" 2 $deployment.autoscaling }}
+        periodSeconds: {{ dig "behavior" "scaleUp" "periodSeconds" 60 $deployment.autoscaling }}
+      selectPolicy: Max
+---
+{{- end }}
+{{- end }}
+{{- end }}

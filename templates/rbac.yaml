@@ -1,0 +1,46 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-role
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+rules:
+  {{- if .Values.rbac.rules }}
+  {{- toYaml .Values.rbac.rules | nindent 2 }}
+  {{- else }}
+  # Default minimal permissions
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  {{- end }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-rolebinding
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "k8s-service-template.fullname" . }}-role
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-service-template.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -1,0 +1,70 @@
+{{- if .Values.configMap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-config
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $key, $value := .Values.configMap.data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  
+  # Default configuration values
+  APP_NAME: {{ include "k8s-service-template.fullname" . | quote }}
+  APP_VERSION: {{ .Chart.AppVersion | quote }}
+  ENVIRONMENT: {{ .Values.global.environment | quote }}
+  PROJECT: {{ .Values.global.project | quote }}
+  NAMESPACE: {{ .Release.Namespace | quote }}
+  
+  {{- if .Values.database.enabled }}
+  # Database connection settings
+  DATABASE_HOST: {{ include "k8s-service-template.fullname" . }}-db.{{ .Release.Namespace }}.svc.cluster.local
+  DATABASE_PORT: {{ .Values.database.service.port | quote }}
+  {{- if ne .Values.database.type "redis" }}
+  DATABASE_NAME: {{ .Values.database.env.POSTGRES_DB | default .Values.database.env.MYSQL_DATABASE | default "appdb" | quote }}
+  DATABASE_USER: {{ .Values.database.env.POSTGRES_USER | default .Values.database.env.MYSQL_USER | default "appuser" | quote }}
+  {{- else }}
+  {{- if not (hasKey .Values.configMap.data "REDIS_HOST") }}
+  REDIS_HOST: {{ include "k8s-service-template.fullname" . }}-redis.{{ .Release.Namespace }}.svc.cluster.local
+  {{- end }}
+  {{- if not (hasKey .Values.configMap.data "REDIS_PORT") }}
+  REDIS_PORT: {{ .Values.database.service.port | quote }}
+  {{- end }}
+  {{- if not (hasKey .Values.configMap.data "REDIS_DB") }}
+  REDIS_DB: {{ .Values.database.env.REDIS_DB | default "0" | quote }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+
+  {{- if .Values.databases }}
+  # Multiple databases connection settings
+  {{- range $dbName, $db := .Values.databases }}
+  {{- if $db.enabled }}
+  {{- $upperName := upper $dbName | replace "-" "_" }}
+  DATABASE_{{ $upperName }}_HOST: {{ include "k8s-service-template.fullname" $ }}-{{ $dbName }}.{{ $.Release.Namespace }}.svc.cluster.local
+  DATABASE_{{ $upperName }}_PORT: {{ $db.service.port | quote }}
+  {{- if eq $db.type "redis" }}
+  REDIS_{{ $upperName }}_HOST: {{ include "k8s-service-template.fullname" $ }}-{{ $dbName }}.{{ $.Release.Namespace }}.svc.cluster.local
+  REDIS_{{ $upperName }}_PORT: {{ $db.service.port | quote }}
+  {{- if $db.env.REDIS_DB }}
+  REDIS_{{ $upperName }}_DB: {{ $db.env.REDIS_DB | quote }}
+  {{- end }}
+  {{- else if eq $db.type "postgresql" }}
+  DATABASE_{{ $upperName }}_NAME: {{ $db.env.POSTGRES_DB | default "appdb" | quote }}
+  DATABASE_{{ $upperName }}_USER: {{ $db.env.POSTGRES_USER | default "appuser" | quote }}
+  {{- else if eq $db.type "mysql" }}
+  DATABASE_{{ $upperName }}_NAME: {{ $db.env.MYSQL_DATABASE | default "appdb" | quote }}
+  DATABASE_{{ $upperName }}_USER: {{ $db.env.MYSQL_USER | default "appuser" | quote }}
+  {{- else if eq $db.type "mongodb" }}
+  DATABASE_{{ $upperName }}_NAME: {{ $db.env.MONGO_INITDB_DATABASE | default "appdb" | quote }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+{{- end }}

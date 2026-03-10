@@ -1,0 +1,39 @@
+name: build-project
+on:
+  push:
+    branches:
+      - 'master'
+    tags:
+      - '**'
+  pull_request:
+    types: [ opened, reopened, synchronize ]
+
+jobs:
+  test-chart:
+    name: Test & Build
+    runs-on: [ self-hosted, medium ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: pip install invoke
+      - run: curl -L https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - run: helm plugin install https://github.com/belitre/helm-push-artifactory-plugin --version 1.0.1
+      - run: invoke test.chart
+      - name: Deploy chart
+        if: github.ref_type == 'tag'
+        env:
+          ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_PWD: ${{ secrets.ARTIFACTORY_PWD }}
+        run: invoke deploy.k8s-service-template --username $ARTIFACTORY_USER --password $ARTIFACTORY_PWD
+  mandatory-checks:
+    name: End of PR checks
+    runs-on: small
+    if: ${{ !cancelled() }}
+    steps:
+      # Makes the check fail if any of the upstream jobs failed
+      - run: exit ${{ contains(needs.*.result, 'failure') && 1 || 0 }}
+    needs:
+      - test-chart

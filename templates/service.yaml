@@ -1,0 +1,115 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "k8s-service-template.selectorLabels" . | nindent 4 }}
+    {{- with .Values.service.selector }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+
+---
+{{- if .Values.database.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-{{ .Values.database.type }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.database.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.database.service.type }}
+  ports:
+    - port: {{ .Values.database.service.port }}
+      targetPort: db
+      protocol: TCP
+      name: db
+  selector:
+    {{- include "k8s-service-template.database.selectorLabels" . | nindent 4 }}
+{{- end }}
+
+{{- if .Values.deployments }}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and $deployment.enabled $deployment.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ $deploymentName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+    app.kubernetes.io/role: {{ $deployment.role | default $deploymentName }}
+  {{- with $deployment.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with (include "k8s-service-template.annotations" $) }}
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $deployment.service.type | default $.Values.service.type }}
+  ports:
+    - port: {{ $deployment.service.port | default $.Values.service.port }}
+      targetPort: {{ $deployment.service.targetPort | default $.Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "k8s-service-template.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.databases }}
+{{- range $dbName, $db := .Values.databases }}
+{{- if $db.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ $dbName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.databases.labels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" $) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $db.service.type }}
+  ports:
+    - port: {{ $db.service.port }}
+      targetPort: db
+      protocol: TCP
+      name: db
+  selector:
+    {{- include "k8s-service-template.databases.selectorLabels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,55 @@
+{{- if .Values.persistence.enabled }}
+{{- range .Values.persistence.volumes }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ .name }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: storage
+    volume-name: {{ .name }}
+  {{- with (include "k8s-service-template.annotations" $) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .accessMode }}
+  {{- if .storageClass }}
+  storageClassName: {{ .storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .size }}
+  {{- if .selector }}
+  selector:
+    {{- toYaml .selector | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
+{{- if and .Values.database.enabled (not .Values.database.persistence.enabled) }}
+---
+# Temporary volume for database when persistence is disabled
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-db-temp
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.database.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database-storage
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.database.persistence.storageClass | default "gp3" }}
+  resources:
+    requests:
+      storage: 1Gi
+{{- end }}

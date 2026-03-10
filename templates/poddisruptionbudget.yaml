@@ -1,0 +1,86 @@
+{{/*
+Main deployment PDB
+*/}}
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-pdb
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" . | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "k8s-service-template.selectorLabels" . | nindent 6 }}
+---
+{{- end }}
+{{/*
+Multi-deployment PDBs
+*/}}
+{{- if .Values.deployments }}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and $deployment.enabled $deployment.podDisruptionBudget $deployment.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "k8s-service-template.fullname" $ }}-{{ $deploymentName }}-pdb
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+  {{- with (include "k8s-service-template.annotations" $) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $deployment.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ $deployment.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if $deployment.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ $deployment.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "k8s-service-template.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $deploymentName }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
+{{/*
+Database StatefulSet PDB
+*/}}
+{{- if and .Values.database.enabled .Values.database.podDisruptionBudget .Values.database.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "k8s-service-template.fullname" . }}-{{ .Values.database.type }}-pdb
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "k8s-service-template.database.labels" . | nindent 4 }}
+  {{- with (include "k8s-service-template.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.database.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.database.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.database.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.database.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "k8s-service-template.database.selectorLabels" . | nindent 6 }}
+{{- end }}
