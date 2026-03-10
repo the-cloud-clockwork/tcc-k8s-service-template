@@ -1,0 +1,37 @@
+name: release-dev-chart
+
+on:
+  push:
+    branches:
+      - 'dev'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release-dev:
+    name: Package & Push Dev Chart to GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Build dev version string
+        id: version
+        run: |
+          BASE_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
+          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
+          echo "version=${BASE_VERSION}-dev.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package chart
+        run: helm package . --version "${{ steps.version.outputs.version }}"
+
+      - name: Push to GHCR
+        run: helm push tccw-k8s-service-template-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/the-cloud-clock-work
