@@ -1,5 +1,5 @@
 apiVersion: v2
-name: tcc-k8s-service-template
+name: tccw-k8s-service-template
 description: A Helm chart for deploying services on Kubernetes with AWS Load Balancer Controller integration
 type: application
 version: 0.1.0
@@ -10,11 +10,11 @@ keywords:
   - aws
   - alb
   - microservice
-home: https://github.com/the-cloud-clockwork/tcc-k8s-service-template
+home: https://github.com/The-Cloud-Clock-Work/tccw-k8s-service-template
 sources:
-  - https://github.com/the-cloud-clockwork/tcc-k8s-service-template
+  - https://github.com/The-Cloud-Clock-Work/tccw-k8s-service-template
 maintainers:
-  - name: The Cloud Clockwork
+  - name: The Cloud Clock Work
     email: platform@thecloudclockwork.com
 icon: https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.svg
 annotations:

@@ -30,6 +30,8 @@ examples/
 tests/
 *.test
 *.log
+# Build tasks
+tasks/
 # CI/CD files
 .github/
 .gitlab-ci.yml
