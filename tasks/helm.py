@@ -1,4 +1,4 @@
-CHART_REPO = "https://your-artifactory.example.com/artifactory/helm-virtual/"
-CHART_REPO_ALIAS = "your-org"
-DEV_CHART_REPO = "https://your-artifactory.example.com/artifactory/helm-ephemeral-virtual/"
-DEV_CHART_REPO_ALIAS = "your-org-ephemeral"
+CHART_REPO = "oci://ghcr.io/the-cloud-clock-work"
+CHART_REPO_ALIAS = "tccw"
+DEV_CHART_REPO = "oci://ghcr.io/the-cloud-clock-work"
+DEV_CHART_REPO_ALIAS = "tccw-dev"
