@@ -43,9 +43,16 @@ app:
       cpu: 250m
       memory: 256Mi
       
+  # Lifecycle hooks (e.g. preStop drain)
+  lifecycle: {}
+
+  # Termination grace period (seconds) — default 30, override for long-running drains
+  terminationGracePeriodSeconds: 30
+
   # Health checks
   healthChecks:
     enabled: true
+    startupProbe: {}
     livenessProbe:
       httpGet:
         path: /health
@@ -70,6 +77,9 @@ env:
     ENV: "development"
     LOG_LEVEL: "info"
   
+  # Extra env entries (list of env var definitions with valueFrom, etc.)
+  extra: []
+
   # Reference to configmap
   configMapRef: ""
   
@@ -130,6 +140,18 @@ configFiles:
       #   mountPath: "/app/config.yaml"     # Where to mount in container
       #   type: "File"                      # File, Directory, etc.
       #   readOnly: true                    # Mount as read-only (optional)
+
+# External Secrets Operator — auto-creates K8s Secret from AWS Secrets Manager
+externalSecret:
+  enabled: false
+  refreshInterval: "5m"
+  storeName: "aws-secrets-manager"
+  storeKind: "ClusterSecretStore"
+  awsSecretPath: ""
+  targetSecretName: ""
+  creationPolicy: "Owner"
+  deletionPolicy: "Retain"
+  extraData: []
 
 # Secrets configuration
 secrets:
