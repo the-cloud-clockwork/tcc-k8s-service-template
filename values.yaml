@@ -141,6 +141,18 @@ configFiles:
       #   type: "File"                      # File, Directory, etc.
       #   readOnly: true                    # Mount as read-only (optional)
 
+# External Secrets Operator — auto-creates K8s Secret from AWS Secrets Manager
+externalSecret:
+  enabled: false
+  refreshInterval: "5m"
+  storeName: "aws-secrets-manager"
+  storeKind: "ClusterSecretStore"
+  awsSecretPath: ""
+  targetSecretName: ""
+  creationPolicy: "Owner"
+  deletionPolicy: "Retain"
+  extraData: []
+
 # Secrets configuration
 secrets:
   enabled: true
