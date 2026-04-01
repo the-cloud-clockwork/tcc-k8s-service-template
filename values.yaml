@@ -577,7 +577,8 @@ monitoring:
     interval: 30s
     
 # Pod annotations and labels
-podAnnotations: {}
+podAnnotations:
+  reloader.stakater.com/auto: "true"
 podLabels: {}
 
 # Node selector
