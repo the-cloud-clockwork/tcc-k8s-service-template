@@ -144,7 +144,7 @@ configFiles:
 # External Secrets Operator — auto-creates K8s Secret from AWS Secrets Manager
 externalSecret:
   enabled: false
-  refreshInterval: "5m"
+  refreshInterval: "30s"
   storeName: "aws-secrets-manager"
   storeKind: "ClusterSecretStore"
   awsSecretPath: ""
