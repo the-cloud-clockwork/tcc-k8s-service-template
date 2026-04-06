@@ -117,3 +117,5 @@ test_smtp.py
 *.tgz
 
 .claude/settings.local.json
+
+.claude/CLAUDE.local.md
