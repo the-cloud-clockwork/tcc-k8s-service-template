@@ -145,7 +145,7 @@ configFiles:
 externalSecret:
   enabled: false
   refreshInterval: "30s"
-  storeName: "aws-secrets-manager"
+  storeName: "openbao"
   storeKind: "ClusterSecretStore"
   secretPath: ""
   awsSecretPath: ""  # DEPRECATED: use secretPath instead
