@@ -141,13 +141,14 @@ configFiles:
       #   type: "File"                      # File, Directory, etc.
       #   readOnly: true                    # Mount as read-only (optional)
 
-# External Secrets Operator — auto-creates K8s Secret from AWS Secrets Manager
+# External Secrets Operator — auto-creates K8s Secret from secret store (OpenBao/Vault)
 externalSecret:
   enabled: false
   refreshInterval: "30s"
-  storeName: "aws-secrets-manager"
+  storeName: "openbao"
   storeKind: "ClusterSecretStore"
-  awsSecretPath: ""
+  secretPath: ""
+  awsSecretPath: ""  # DEPRECATED: use secretPath instead
   targetSecretName: ""
   creationPolicy: "Owner"
   deletionPolicy: "Retain"
