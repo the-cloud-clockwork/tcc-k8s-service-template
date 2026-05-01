@@ -12,6 +12,7 @@ metadata:
   {{- end }}
 spec:
   serviceName: {{ include "k8s-service-template.fullname" . }}-{{ .Values.database.type }}-headless
+  podManagementPolicy: {{ .Values.database.statefulset.podManagementPolicy | default "OrderedReady" }}
   replicas: {{ .Values.database.statefulset.replicaCount }}
   selector:
     matchLabels:
@@ -222,6 +223,7 @@ metadata:
   {{- end }}
 spec:
   serviceName: {{ include "k8s-service-template.fullname" $ }}-{{ $dbName }}-headless
+  podManagementPolicy: {{ $db.statefulset.podManagementPolicy | default "OrderedReady" }}
   replicas: {{ $db.statefulset.replicaCount | default 1 }}
   selector:
     matchLabels:
