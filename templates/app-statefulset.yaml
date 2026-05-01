@@ -12,6 +12,7 @@ metadata:
   {{- end }}
 spec:
   serviceName: {{ include "k8s-service-template.fullname" . }}-headless
+  podManagementPolicy: {{ .Values.app.podManagementPolicy | default "OrderedReady" }}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.app.replicaCount }}
   {{- end }}
