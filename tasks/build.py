@@ -26,7 +26,7 @@ def build_chart(
         )
     # Handle the case where chart_dir is "." - use the actual chart name
     if chart_dir == ".":
-        chart_name = "tccw-k8s-service-template"
+        chart_name = "tcc-k8s-service-template"
     else:
         chart_name = chart_dir.split("/")[-1]
     chart_file = chart_name + "-" + chart_version + ".tgz"
