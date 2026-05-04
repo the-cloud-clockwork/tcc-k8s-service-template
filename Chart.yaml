@@ -2,7 +2,7 @@ apiVersion: v2
 name: tcc-k8s-service-template
 description: A Helm chart for deploying services on Kubernetes with AWS Load Balancer Controller integration
 type: application
-version: 0.3.7
+version: 0.3.8
 appVersion: "0.3.7"
 keywords:
   - kubernetes
