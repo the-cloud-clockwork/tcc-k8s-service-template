@@ -19,6 +19,6 @@ def k8s_service_template(ctx, chart_file=None, version=None, dev=False):
         packaged_chart_file = chart_file
     else:
         chart_version = version if version is not None else helpers.get_project_version(ctx)
-        packaged_chart_file = "tccw-k8s-service-template-" + chart_version + ".tgz"
+        packaged_chart_file = "tcc-k8s-service-template-" + chart_version + ".tgz"
 
     publish_chart(ctx, packaged_chart_file, dev=dev)

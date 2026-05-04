@@ -31,4 +31,4 @@ jobs:
         run: helm package . --version "${{ steps.version.outputs.version }}"
 
       - name: Push to GHCR
-        run: helm push tccw-k8s-service-template-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/the-cloud-clock-work
+        run: helm push tcc-k8s-service-template-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/the-cloud-clockwork
