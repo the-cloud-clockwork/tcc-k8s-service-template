@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   compute-version:
-    runs-on: ubuntu-latest
+    runs-on: anton
     outputs:
       current: ${{ steps.version.outputs.current }}
       next: ${{ steps.version.outputs.next }}
@@ -40,7 +40,7 @@ jobs:
   release-dev:
     needs: compute-version
     if: github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-latest
+    runs-on: anton
     steps:
       - uses: actions/checkout@v4
 
@@ -57,7 +57,7 @@ jobs:
   release-main:
     needs: compute-version
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: anton
     steps:
       - uses: actions/checkout@v4
         with:

@@ -11,7 +11,7 @@ on:
 jobs:
   lint-chart:
     name: Lint & Validate
-    runs-on: ubuntu-latest
+    runs-on: anton
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
 
   mandatory-checks:
     name: End of PR checks
-    runs-on: ubuntu-latest
+    runs-on: anton
     if: ${{ !cancelled() }}
     steps:
       - run: exit ${{ contains(needs.*.result, 'failure') && 1 || 0 }}
