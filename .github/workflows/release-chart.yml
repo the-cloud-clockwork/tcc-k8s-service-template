@@ -12,7 +12,7 @@ permissions:
 jobs:
   release:
     name: Package & Push Helm Chart to GHCR
-    runs-on: anton
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
