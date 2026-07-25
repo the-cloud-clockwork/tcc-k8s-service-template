@@ -8,7 +8,7 @@ on:
 jobs:
   tag:
     if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
-    runs-on: anton
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:

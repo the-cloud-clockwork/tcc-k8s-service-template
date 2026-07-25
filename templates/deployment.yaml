@@ -115,12 +115,12 @@ spec:
           {{- if .Values.app.healthChecks.enabled }}
           {{- with .Values.app.healthChecks.startupProbe }}
           startupProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- include "k8s-service-template.sanitizeProbe" . | nindent 12 }}
           {{- end }}
           livenessProbe:
-            {{- toYaml .Values.app.healthChecks.livenessProbe | nindent 12 }}
+            {{- include "k8s-service-template.sanitizeProbe" .Values.app.healthChecks.livenessProbe | nindent 12 }}
           readinessProbe:
-            {{- toYaml .Values.app.healthChecks.readinessProbe | nindent 12 }}
+            {{- include "k8s-service-template.sanitizeProbe" .Values.app.healthChecks.readinessProbe | nindent 12 }}
           {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
