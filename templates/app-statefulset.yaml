@@ -75,8 +75,9 @@ spec:
               protocol: TCP
           env:
             {{- include "k8s-service-template.env" . | nindent 12 }}
-          {{- if .Values.secrets.enabled }}
+          {{- if or .Values.secrets.enabled .Values.configMap.enabled }}
           envFrom:
+            {{- if .Values.secrets.enabled }}
             {{- if .Values.secrets.external.enabled }}
             {{- if .Values.secrets.external.secretName }}
             - secretRef:
@@ -89,10 +90,11 @@ spec:
             - secretRef:
                 name: {{ include "k8s-service-template.fullname" . }}-secrets
             {{- end }}
-          {{- end }}
-          {{- if .Values.configMap.enabled }}
+            {{- end }}
+            {{- if .Values.configMap.enabled }}
             - configMapRef:
                 name: {{ include "k8s-service-template.fullname" . }}-config
+            {{- end }}
           {{- end }}
           {{- if .Values.app.healthChecks.enabled }}
           {{- with .Values.app.healthChecks.startupProbe }}

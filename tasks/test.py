@@ -14,3 +14,4 @@ def chart(ctx,):
                 helm lint .
             """
         )
+        ctx.run("python3 ci/render_matrix.py .")
