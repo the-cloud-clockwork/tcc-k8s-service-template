@@ -4,16 +4,27 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  # Recovery path. The auto-tag fires only on a release/* PR merging into main,
+  # so a release whose tag step failed (ORG_GITHUB_TOKEN unset, 2026-08-21)
+  # leaves a published chart with no tag and no way to reach this workflow.
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Ref to tag (branch, tag or SHA)"
+        required: true
+        default: "main"
+        type: string
 
 jobs:
   tag:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref || github.ref }}
           token: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Read version and create tag
@@ -31,6 +42,7 @@ jobs:
           echo "Created and pushed tag $TAG"
 
       - name: Clean up release branch
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
