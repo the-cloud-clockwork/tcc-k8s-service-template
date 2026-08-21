@@ -25,6 +25,27 @@ jobs:
       - name: Template render test
         run: helm template test-render . --debug
 
+      - name: Render matrix — one producer per Secret name
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 ci/render_matrix.py .
+
+      - name: Schema-validate every scenario
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C /usr/local/bin kubeconform
+          set -- \
+            "" \
+            "--set externalSecret.enabled=true --set externalSecret.secretPath=k8s/x" \
+            "--set externalSecret.enabled=true --set externalSecret.secretPath=k8s/x --set app.type=statefulset" \
+            "--set secrets.external.enabled=true --set secrets.external.secretName=x-secrets" \
+            "--set secrets.enabled=false --set configMap.enabled=true"
+          for scenario in "$@"; do
+            echo "::group::kubeconform ${scenario:-<defaults>}"
+            helm template rel . $scenario | kubeconform -strict -summary -ignore-missing-schemas -
+            echo "::endgroup::"
+          done
+
   mandatory-checks:
     name: End of PR checks
     runs-on: ubuntu-latest
