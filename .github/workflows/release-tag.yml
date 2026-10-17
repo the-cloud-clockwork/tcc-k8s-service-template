@@ -5,7 +5,7 @@ on:
     types: [closed]
     branches: [main]
   # Recovery path. The auto-tag fires only on a release/* PR merging into main,
-  # so a release whose tag step failed (ORG_GITHUB_TOKEN unset, 2026-08-21)
+  # so a release whose tag step failed
   # leaves a published chart with no tag and no way to reach this workflow.
   workflow_dispatch:
     inputs:
@@ -20,12 +20,20 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/'))
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
+      - name: Mint repository scoped CI App token
+        id: app-token
+        uses: actions/create-github-app-token@v3.2.0
+        with:
+          client-id: ${{ secrets.TCC_CI_CLIENT_ID }}
+          private-key: ${{ secrets.TCC_CI_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.ref }}
-          token: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Read version and create tag
         run: |
