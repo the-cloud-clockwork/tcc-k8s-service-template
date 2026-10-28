@@ -169,7 +169,7 @@ spec:
     - metadata:
         name: data
         labels:
-          {{- include "k8s-service-template.database.labels" . | nindent 10 }}
+          {{- include "k8s-service-template.database.selectorLabels" . | nindent 10 }}
       spec:
         accessModes:
           - {{ .Values.database.persistence.accessMode }}
@@ -388,7 +388,7 @@ spec:
     - metadata:
         name: data
         labels:
-          {{- include "k8s-service-template.databases.labels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 10 }}
+          {{- include "k8s-service-template.databases.selectorLabels" (dict "root" $ "name" $dbName "type" $db.type) | nindent 10 }}
       spec:
         accessModes:
           - {{ $db.persistence.accessMode }}
