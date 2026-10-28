@@ -95,6 +95,21 @@ def main() -> int:
     check("configMap without secrets: configMapRef lands in envFrom",
           container(docs, "Deployment").get("envFrom"), [{"configMapRef": {"name": CONFIG}}])
 
+    volume = ["persistence.enabled=true", "persistence.volumes[0].name=data",
+              "persistence.volumes[0].size=1Gi", "persistence.volumes[0].accessMode=ReadWriteOnce",
+              "persistence.volumes[0].mountPath=/data"]
+    docs = render(*volume, "app.type=statefulset")
+    check("statefulset persistence: no standalone claim",
+          [d["metadata"]["name"] for d in docs if d["kind"] == "PersistentVolumeClaim"], [])
+    check("statefulset persistence: the claim template stays",
+          [t["metadata"]["name"] for d in docs if d["kind"] == "StatefulSet"
+           for t in d["spec"].get("volumeClaimTemplates", [])], ["data"])
+
+    docs = render(*volume)
+    check("deployment persistence: the standalone claim stays",
+          [d["metadata"]["name"] for d in docs if d["kind"] == "PersistentVolumeClaim"],
+          [f"{RELEASE}-tcc-k8s-service-template-data"])
+
     docs = render()
     check("defaults: one producer per Secret name", producers(docs), {})
     check("defaults: envFrom mounts the chart Secret",
