@@ -153,7 +153,7 @@ spec:
     - metadata:
         name: {{ .name }}
         labels:
-          {{- include "k8s-service-template.selectorLabels" $ | nindent 10 }}
+          {{- include "k8s-service-template.claimLabels" (dict "root" $ "selector" (include "k8s-service-template.selectorLabels" $)) | nindent 10 }}
       spec:
         accessModes:
           - {{ .accessMode }}
