@@ -49,6 +49,20 @@ project: {{ .Values.global.project }}
 {{- end }}
 
 {{/*
+Claim template labels: volumeClaimTemplates are immutable, so no chart or app version
+*/}}
+{{- define "k8s-service-template.claimLabels" -}}
+{{ .selector }}
+app.kubernetes.io/managed-by: {{ .root.Release.Service }}
+app.kubernetes.io/part-of: {{ include "k8s-service-template.name" .root }}
+environment: {{ .root.Values.global.environment }}
+project: {{ .root.Values.global.project }}
+{{- if .root.Values.commonLabels }}
+{{ toYaml .root.Values.commonLabels }}
+{{- end }}
+{{- end }}
+
+{{/*
 Selector labels
 */}}
 {{- define "k8s-service-template.selectorLabels" -}}

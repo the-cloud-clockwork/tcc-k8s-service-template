@@ -5,8 +5,11 @@
 2026-08-21 QITP incident, because the output is valid YAML either way. The
 invariant has to be asserted on object identity instead.
 """
+import shutil
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 import yaml
 
@@ -17,8 +20,8 @@ CONFIG = f"{RELEASE}-tcc-k8s-service-template-config"
 ES = ["externalSecret.enabled=true", "externalSecret.secretPath=k8s/x"]
 
 
-def render(*sets: str) -> list[dict]:
-    argv = ["helm", "template", RELEASE, CHART]
+def render(*sets: str, chart: str = CHART) -> list[dict]:
+    argv = ["helm", "template", RELEASE, chart]
     for s in sets:
         argv += ["--set", s]
     proc = subprocess.run(argv, capture_output=True, text=True)
@@ -52,6 +55,21 @@ def container(docs: list[dict], kind: str) -> dict:
 
 def secret_refs(c: dict) -> list[str]:
     return [e["secretRef"]["name"] for e in (c.get("envFrom") or []) if "secretRef" in e]
+
+
+def bumped_chart(tmp: str) -> str:
+    dst = Path(tmp) / "chart"
+    shutil.copytree(CHART, dst)
+    meta = yaml.safe_load((dst / "Chart.yaml").read_text())
+    meta["version"] = "99.0.0"
+    meta["appVersion"] = "99.0.0"
+    (dst / "Chart.yaml").write_text(yaml.safe_dump(meta))
+    return str(dst)
+
+
+def claim_templates(docs: list[dict]) -> dict[str, list[dict]]:
+    return {d["metadata"]["name"]: d["spec"].get("volumeClaimTemplates", [])
+            for d in docs if d["kind"] == "StatefulSet"}
 
 
 FAILED = False
@@ -104,6 +122,25 @@ def main() -> int:
     check("statefulset persistence: the claim template stays",
           [t["metadata"]["name"] for d in docs if d["kind"] == "StatefulSet"
            for t in d["spec"].get("volumeClaimTemplates", [])], ["data"])
+
+    multi_db = ["databases.cache.enabled=true", "databases.cache.type=redis",
+                "databases.cache.image.repository=redis", "databases.cache.image.tag=7.2",
+                "databases.cache.statefulset.replicaCount=1", "databases.cache.service.port=6379", "databases.cache.env.REDIS_DB=0",
+                "databases.cache.persistence.enabled=true",
+                "databases.cache.persistence.accessMode=ReadWriteOnce",
+                "databases.cache.persistence.storageClass=standard",
+                "databases.cache.persistence.size=1Gi"]
+    app = (*volume, "app.type=statefulset")
+    dbs = ("database.enabled=true", *multi_db)
+    with tempfile.TemporaryDirectory() as tmp:
+        bumped = bumped_chart(tmp)
+        before = claim_templates(render(*app)) | claim_templates(render(*dbs))
+        after = claim_templates(render(*app, chart=bumped)) | claim_templates(render(*dbs, chart=bumped))
+    check("statefulset claim templates: one per StatefulSet",
+          sorted(name for name, t in before.items() if t),
+          ["rel-tcc-k8s-service-template", "rel-tcc-k8s-service-template-cache",
+           "rel-tcc-k8s-service-template-postgresql"])
+    check("statefulset claim templates: a version bump leaves them identical", after, before)
 
     docs = render(*volume)
     check("deployment persistence: the standalone claim stays",
